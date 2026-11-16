@@ -1,0 +1,5 @@
+﻿# dsh bundle patch: inserts the pozhang settings entry into a profile's layer stack.
+# id 沿用旧值 code-studio-pozhang，服务名仍 pozhangSettings —— 从工作室迁过来升级不重复插。
+- insert:
+    - id: code-studio-pozhang
+      name: '@white-gamerzzz/dsh-plugin-pozhang/settings'

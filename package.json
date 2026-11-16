@@ -1,0 +1,52 @@
+﻿{
+  "name": "@white-gamerzzz/dsh-plugin-pozhang",
+  "version": "0.1.0",
+  "description": "破障注入子系统（自 dsh-plugin-code-studio 拆出）：AGENTS.md 幂等注入、进程内拦截、出站口接管、中继监控与技能库，可独立安装。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./settings": {
+      "default": "./lib/pozhang-settings.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "pozhang",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "pozhang"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.4 <5.0.0",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1",
+    "@deepseek-ai/schemastery": ">=3.18.4 <4.0.0"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0-rc.1"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "smoke": "node pozhang/smoke.mjs",
+    "test": "node pozhang/smoke.mjs && node pozhang/patch.test.mjs && node pozhang/autoroute.test.mjs && node pozhang/relay.test.mjs && node pozhang/chain.test.mjs && node pozhang/chain-fallback.test.mjs && node pozhang/intercept.test.mjs && node pozhang/dispatcher.test.mjs"
+  }
+}

@@ -1,0 +1,10 @@
+node_modules/
+*.tgz
+*.log
+.probe/
+.DS_Store
+Thumbs.db
+# 本地实验/临时产物
+*.local.*
+.vscode/
+.idea/
