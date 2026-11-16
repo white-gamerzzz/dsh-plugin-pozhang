@@ -1,4 +1,4 @@
-# @white-gamerzzz/dsh-plugin-pozhang · 破障注入子系统
+# @whitegamerzzz/dsh-plugin-pozhang · 破障注入子系统
 
 从 `dsh-plugin-code-studio` 拆出的独立插件：AGENTS.md 幂等注入、进程内出站拦截、HTTP 中继监控、技能库。可单独安装。
 
@@ -15,7 +15,7 @@ npm i dsh-plugin-pozhang
 ```yaml
 - insert:
     - id: code-studio-pozhang
-      name: '@white-gamerzzz/dsh-plugin-pozhang/settings'
+      name: '@whitegamerzzz/dsh-plugin-pozhang/settings'
 ```
 
 peerDependencies 只要求宿主已具备的三件：`@deepseek-ai/cordis`、`@deepseek-ai/dsh`、`@deepseek-ai/schemastery`。Node `>=20`。
