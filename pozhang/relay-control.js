@@ -93,27 +93,13 @@ export async function startRelay({ port, upstream, log = () => {} } = {}) {
   try {
     await relay.listen();
   } catch (e) {
-    if (e?.code !== 'EADDRINUSE') {
-      return { ok: false, error: String(e?.message ?? e) };
+    // 端口被占就显式失败：不自动换端口、不改配置，避免「配置一个、实际另一个」的错位。
+    // 落盘在 listen 前已写 enabled:true，这里起不来必须回写 false —— 否则磁盘记「开」而实际没起。
+    saveRelayConfig({ enabled: false });
+    if (e?.code === 'EADDRINUSE') {
+      return { ok: false, error: '端口 EADDRINUSE' };
     }
-    // 端口被占 → 自动找邻近空位（动态端口），并把实际端口写回配置，
-    // 这样上游/前端/自检都从注册表读，不会出现「配置 8788、实际 8791」的错位。
-    for (let cand = p + 1; cand <= p + 20; cand += 1) {
-      const probe = await probeRelay(cand);
-      if (probe.running) continue;
-      const alt = createRelay({ port: cand, upstream: up, via: bili });
-      try {
-        await alt.listen();
-      } catch {
-        continue;
-      }
-      current = { relay: alt, port: cand, upstream: up };
-      saveRelayConfig({ port: cand, upstream: up, enabled: true, pid: null });
-      log(`端口 ${p} 被占用，中继改用 ${cand}`);
-      armViaRefresh(bili);
-      return { ok: true, started: true, port: cand, upstream: up, shiftedFrom: p };
-    }
-    return { ok: false, error: `端口 ${p} 及邻近 20 个都被占用` };
+    return { ok: false, error: String(e?.message ?? e) };
   }
   current = { relay, port: p, upstream: up };
   log(`relay 已启动 http://127.0.0.1:${p}`);

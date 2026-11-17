@@ -27,6 +27,23 @@ import { interceptStatus } from './intercept.js';
 
 export { IDENTITY, ROLE_HINT, loadPrompt, decide, applyPatch } from './patch.js';
 
+/** 是否本机回环地址（只认 socket 对端，绝不信任任何代理头）。 */
+export function isLoopback(addr) {
+  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
+
+/** CORS：只回显来自回环页面的 Origin，其余一律不授权。 */
+function corsOrigin(req) {
+  const origin = req.headers.origin;
+  if (typeof origin !== 'string') return '';
+  try {
+    const h = new URL(origin).hostname;
+    return (h === '127.0.0.1' || h === 'localhost' || h === '::1') ? origin : '';
+  } catch {
+    return '';
+  }
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -142,13 +159,14 @@ export function createRelay({ port = 8788, upstream = 'https://api.deepseek.com'
     const url = req.url || '/';
 
     if (url === '/_pozhang/health') {
+      if (!isLoopback(req.socket.remoteAddress)) { res.writeHead(403, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify({ error: 'FORBIDDEN', message: '仅限本机回环访问' })); return; }
       sweep();
       const prompt = loadPrompt();
       res.writeHead(200, {
         'content-type': 'application/json; charset=utf-8',
         'cache-control': 'no-store',
-        // 设置页在 dsh 客户端里跨端口读状态，需要 CORS（仅本机回环监听）
-        'access-control-allow-origin': '*',
+        // 跨端口读状态；CORS 只回显回环 Origin，绝不 '*'
+        ...(corsOrigin(req) ? { 'access-control-allow-origin': corsOrigin(req) } : {}),
       });
       res.end(JSON.stringify({
         ok: true,
@@ -168,7 +186,8 @@ export function createRelay({ port = 8788, upstream = 'https://api.deepseek.com'
       return;
     }
     if (url === '/_pozhang/panel') {
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'access-control-allow-origin': '*' });
+      if (!isLoopback(req.socket.remoteAddress)) { res.writeHead(403, { 'content-type': 'text/html; charset=utf-8' }); res.end('仅限本机回环访问'); return; }
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...(corsOrigin(req) ? { 'access-control-allow-origin': corsOrigin(req) } : {}) });
       res.end(panelHtml(sessionTtlMs));
       return;
     }
@@ -178,7 +197,7 @@ export function createRelay({ port = 8788, upstream = 'https://api.deepseek.com'
     if (!route) {
       res.writeHead(400, {
         'content-type': 'application/json; charset=utf-8',
-        'access-control-allow-origin': '*',
+        ...(corsOrigin(req) ? { 'access-control-allow-origin': corsOrigin(req) } : {}),
       });
       res.end(JSON.stringify({
         error: 'NO_PROVIDER_ROUTE',
@@ -217,7 +236,7 @@ export function createRelay({ port = 8788, upstream = 'https://api.deepseek.com'
           if (verbose) console.log(`[patch] ${d.reason} -> ${r.where} (session ${s.key.slice(0, 16)})`);
         }
         if (dryRun) {
-          res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
+          res.writeHead(200, { 'content-type': 'application/json', ...(corsOrigin(req) ? { 'access-control-allow-origin': corsOrigin(req) } : {}) });
           res.end(JSON.stringify({ dryRun: true, decision: d.action, reason: d.reason, stats }));
           return;
         }
@@ -277,6 +296,8 @@ export function createRelay({ port = 8788, upstream = 'https://api.deepseek.com'
         path: target.pathname + target.search,
         method: req.method,
         headers: upstreamHeaders,
+        // ponytail: tlsLoose 命中的上游证书校验放宽到 false（仅本机回环中继、目标为已知上游），
+        // 换取企业/中间人 CA 环境下可用；后续应支持配置自定义 CA（NODE_EXTRA_CA_CERTS / 传入 ca），届时删掉此降级。
         ...(mode === 'insecure' ? { rejectUnauthorized: false } : {}),
       }, (upRes) => {
         if (mode === 'direct' || mode === 'insecure') stats.direct += 1;

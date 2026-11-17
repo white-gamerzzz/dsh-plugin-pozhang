@@ -2,7 +2,9 @@
 
 从 `dsh-plugin-code-studio` 拆出的独立插件：AGENTS.md 幂等注入、进程内出站拦截、HTTP 中继监控、技能库。可单独安装。
 
-生命周期由宿主（`dsh-plugin-code-studio`）的 `apply()` 驱动；本包**不写 `apply()`、不抢端口**。宿主按名从包根取符号（`installInterceptor` / `ensureRouted` / `startRelay` …），本包只负责把实现聚合导出。
+**自驱动**：本包自带 `lib/apply.js`（`name='pozhang'`），由 profile 的 cordis patch 直接挂载，加载即幂等注入 AGENTS.md、挂进程内拦截、启中继并接管出站口。监听一律只绑 `127.0.0.1`；端口被占显式失败，绝不偷偷换端口。
+
+> **软依赖提示**：破障驱动已内置在本独立包；`dsh-plugin-code-studio` 只是可选消费方——只升级 code-studio 而未安装本独立包时，破障能力会静默降级，需另行安装 `@whitegamerzzz/dsh-plugin-pozhang`。
 
 ## 安装
 
@@ -16,6 +18,8 @@ npm i dsh-plugin-pozhang
 - insert:
     - id: code-studio-pozhang
       name: '@whitegamerzzz/dsh-plugin-pozhang/settings'
+    - id: code-studio-pozhang-driver
+      name: '@whitegamerzzz/dsh-plugin-pozhang'
 ```
 
 peerDependencies 只要求宿主已具备的三件：`@deepseek-ai/cordis`、`@deepseek-ai/dsh`、`@deepseek-ai/schemastery`。Node `>=20`。
@@ -32,7 +36,7 @@ peerDependencies 只要求宿主已具备的三件：`@deepseek-ai/cordis`、`@d
 /hz relay off               # 关中继
 ```
 
-设置页「代码工作室」里的**破障中继**一块（服务名 `pozhangSettings`）：`interceptEnabled` / `relayEnabled` / `relayPort`。
+设置页里独立的**破障**导航项（服务名 `pozhangSettings`，自带面板）：`interceptEnabled` / `relayEnabled` / `relayPort`。
 
 ## 宿主缺失时的降级
 

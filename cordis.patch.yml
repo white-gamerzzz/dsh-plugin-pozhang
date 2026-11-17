@@ -1,5 +1,8 @@
-# dsh bundle patch: inserts the pozhang settings entry into a profile's layer stack.
+# dsh bundle patch: inserts the pozhang settings entry + the self-driving plugin entry.
 # id 沿用旧值 code-studio-pozhang，服务名仍 pozhangSettings —— 从工作室迁过来升级不重复插。
+# 第二阶段：本包自驱动。第一行挂设置页 Service，第二行挂本包 apply()（lib/apply.js 经包根再导出）。
 - insert:
     - id: code-studio-pozhang
       name: '@whitegamerzzz/dsh-plugin-pozhang/settings'
+    - id: code-studio-pozhang-driver
+      name: '@whitegamerzzz/dsh-plugin-pozhang'

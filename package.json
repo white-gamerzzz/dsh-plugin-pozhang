@@ -1,6 +1,6 @@
 {
   "name": "@whitegamerzzz/dsh-plugin-pozhang",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "破障注入子系统（自 dsh-plugin-code-studio 拆出）：AGENTS.md 幂等注入、进程内拦截、出站口接管、中继监控与技能库，可独立安装。",
   "type": "module",
   "main": "lib/index.js",
@@ -11,12 +11,14 @@
     "./settings": {
       "default": "./lib/pozhang-settings.js"
     },
+    "./client": "./client.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "files": [
     "lib",
     "pozhang",
+    "client.js",
     "cordis.patch.yml",
     "README.md"
   ],
@@ -40,6 +42,13 @@
     },
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
     }
   },
   "publishConfig": {
