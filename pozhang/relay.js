@@ -32,16 +32,17 @@ export function isLoopback(addr) {
   return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
 }
 
-/** CORS：只回显来自回环页面的 Origin，其余一律不授权。 */
+/** CORS：回环页面回显其 Origin；桌面壳等无法按 hostname 校验的来源，在 socket 已确认回环时放行 '*'。 */
 function corsOrigin(req) {
+  const loopback = isLoopback(req.socket.remoteAddress);
   const origin = req.headers.origin;
-  if (typeof origin !== 'string') return '';
+  if (typeof origin !== 'string') return loopback ? '*' : '';
   try {
     const h = new URL(origin).hostname;
-    return (h === '127.0.0.1' || h === 'localhost' || h === '::1') ? origin : '';
-  } catch {
-    return '';
-  }
+    if (h === '127.0.0.1' || h === 'localhost' || h === '::1') return origin;
+  } catch {}
+  // ponytail: 桌面壳 app:// / file://(null) 无法按 hostname 校验；socket 已确认回环即放行浏览器读取。上限：浏览器内任意页面可读本机 relay 状态（与拆包前一致）；要收紧就改 host 侧同源代理，别直接删这行。
+  return loopback ? '*' : '';
 }
 
 function readBody(req) {

@@ -1,6 +1,6 @@
 {
   "name": "@whitegamerzzz/dsh-plugin-pozhang",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "破障注入子系统（自 dsh-plugin-code-studio 拆出）：AGENTS.md 幂等注入、进程内拦截、出站口接管、中继监控与技能库，可独立安装。",
   "type": "module",
   "main": "lib/index.js",
