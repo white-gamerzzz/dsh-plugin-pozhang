@@ -32,17 +32,24 @@ export function isLoopback(addr) {
   return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
 }
 
-/** CORS：回环页面回显其 Origin；桌面壳等无法按 hostname 校验的来源，在 socket 已确认回环时放行 '*'。 */
+/** CORS：只精确回显可信 Origin（回环 http(s)，或 DSH 桌面壳自定义 scheme），绝不 '*'。 */
 function corsOrigin(req) {
-  const loopback = isLoopback(req.socket.remoteAddress);
+  if (!isLoopback(req.socket.remoteAddress)) return '';
   const origin = req.headers.origin;
-  if (typeof origin !== 'string') return loopback ? '*' : '';
+  if (typeof origin !== 'string') return '';
   try {
-    const h = new URL(origin).hostname;
-    if (h === '127.0.0.1' || h === 'localhost' || h === '::1') return origin;
+    const u = new URL(origin);
+    if (u.protocol === 'http:' || u.protocol === 'https:') {
+      if (u.hostname === '127.0.0.1' || u.hostname === 'localhost' || u.hostname === '::1') return origin;
+      return '';
+    }
+    if (u.protocol !== 'file:') {
+      // 桌面壳自定义 privileged scheme（实测 DSH 注册的 dsh-app://app，见 app.asar registerSchemesAsPrivileged）：
+      // 浏览器只会为加载在该 scheme 下的页面（即桌面壳自身）发出这个 Origin，外部网页伪造不了 Origin 头。
+      return origin;
+    }
   } catch {}
-  // ponytail: 桌面壳 app:// / file://(null) 无法按 hostname 校验；socket 已确认回环即放行浏览器读取。上限：浏览器内任意页面可读本机 relay 状态（与拆包前一致）；要收紧就改 host 侧同源代理，别直接删这行。
-  return loopback ? '*' : '';
+  return '';
 }
 
 function readBody(req) {
@@ -166,7 +173,7 @@ export function createRelay({ port = 8788, upstream = 'https://api.deepseek.com'
       res.writeHead(200, {
         'content-type': 'application/json; charset=utf-8',
         'cache-control': 'no-store',
-        // 跨端口读状态；CORS 只回显回环 Origin，绝不 '*'
+        // 跨端口读状态；CORS 精确回显可信 Origin（回环 + 桌面壳自定义 scheme），绝不 '*'
         ...(corsOrigin(req) ? { 'access-control-allow-origin': corsOrigin(req) } : {}),
       });
       res.end(JSON.stringify({
