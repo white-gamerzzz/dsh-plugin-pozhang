@@ -890,7 +890,9 @@ async function installDsh(opts) {
   ctx.log("OK: AGENTS.md -> " + agents);
 
   const src = path.join(opts.payloadDir, opts.skillsSource || "codex-skills-v4");
-  const names = listSkillDirs(src);
+  // skipSkills：只刷新 AGENTS.md 块时不重装技能（技能已并入 ~/.dsh/skill-library，
+  // 再装一份到 ~/.dsh/skills 会把它们塞回常驻目录，白占上下文）。
+  const names = opts.skipSkills ? [] : listSkillDirs(src);
   if (names.length) {
     ensureDir(skillsDir);
     for (const n of names) copyTree(path.join(src, n), path.join(skillsDir, n));

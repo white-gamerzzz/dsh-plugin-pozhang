@@ -60,7 +60,8 @@ t('二次注入幂等跳过（未重装技能）', r2.ok === true && r2.changed 
 t('幂等判定耗时可接受 (<500ms)', Date.now() - t0 < 500);
 
 const st = status();
-t('状态 upToDate=true', st.upToDate === true && st.chars > 1000 && st.skills > 0);
+// chars 用注入块自身长度做基准，别再写死阈值（短块改造后只有 972，旧断言 >1000 已过时）
+t('状态 upToDate=true', st.upToDate === true && st.chars === (readInjectedBody() || '').length && st.skills > 0);
 
 // 子 Agent 前缀：与注入块同源，/hz off 后自动为空
 const prefix = agentPrefix();

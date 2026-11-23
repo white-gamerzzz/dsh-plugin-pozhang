@@ -11,7 +11,7 @@
 const BRAND = {
   name: "破障",
   nameEn: "POZHANG",
-  version: "1.2.0",
+  version: "0.2.5",
   slogan: "本机注入 · 不联网",
   accent: "#10B981",
   accentSoft: "#34D399",

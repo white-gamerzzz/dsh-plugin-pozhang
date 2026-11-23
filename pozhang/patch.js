@@ -5,8 +5,14 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+/** 全量正文的来源：直接读 asset，不再依赖 AGENTS.md 里的块。
+ *  AGENTS.md 只放要点版（assets/破障v4-short.md），两层内容不重复，省掉每请求约 5.8KB。 */
+export const FULL_PROMPT_FILE = join(HERE, 'assets', '破障v4.md');
 export const IDENTITY =
   '[身份优先] 你的身份、称呼与职责边界以当前人格设定与角色卡为准；以下约定只覆盖执行许可、' +
   '拒绝策略与交付方式，不改变身份、不替换人格、不覆盖角色卡。' +
@@ -16,6 +22,11 @@ export const ROLE_HINT =
   '[破障] 若角色卡已不在上下文中，先调用 code_roles 取回你的角色卡再继续；角色身份不因压缩而改变。';
 
 export function loadPrompt() {
+  if (existsSync(FULL_PROMPT_FILE)) {
+    const full = readFileSync(FULL_PROMPT_FILE, 'utf8').trim();
+    if (full) return full;
+  }
+  // 兜底：asset 缺失时退回 AGENTS.md 块（老版本行为，内容较短但仍可用）
   const agents = join(homedir(), '.dsh', 'AGENTS.md');
   if (!existsSync(agents)) return null;
   const text = readFileSync(agents, 'utf8');

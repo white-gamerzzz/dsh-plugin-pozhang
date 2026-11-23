@@ -27,7 +27,10 @@ const brand = require('./brand.cjs');
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const ASSETS_DIR = join(HERE, 'assets');
+/** 全量正文：只走 system 层补丁（patch.js 的 loadPrompt 直接读它）与子 Agent 前缀。 */
 export const DEFAULT_PROMPT = '破障v4.md';
+/** 要点版：写进 ~/.dsh/AGENTS.md 的块。两层内容不同，避免同一份 5.8KB 每请求发两遍。 */
+export const SHORT_PROMPT = '破障v4-short.md';
 
 /** dsh 数据目录：与 installer 的 dsh 目标保持一致（HOME/.dsh）。 */
 export function dshDir() {
@@ -69,7 +72,7 @@ function promptBody(promptFile) {
 }
 
 /** 幂等：内容一致就跳过（不重装 3000+ 技能文件），不一致或缺失才走安装引擎。 */
-export async function ensureInjected({ promptFile = DEFAULT_PROMPT, log = noopLog } = {}) {
+export async function ensureInjected({ promptFile = SHORT_PROMPT, log = noopLog } = {}) {
   const want = promptBody(promptFile);
   if (want == null) return { ok: false, changed: false, error: `缺少提示词资源：${promptFile}` };
   const cur = readInjectedBody();
@@ -78,6 +81,9 @@ export async function ensureInjected({ promptFile = DEFAULT_PROMPT, log = noopLo
     payloadDir: ASSETS_DIR,
     promptPath: join(ASSETS_DIR, promptFile),
     skillsSource: 'codex-skills-v4',
+    // 已经有 skill-library 的机器：技能早就并进去了，再装一份到 ~/.dsh/skills
+    // 只会把它们塞回常驻目录白占上下文。全新机器没有该目录，仍照旧装。
+    skipSkills: existsSync(join(dshDir(), 'skill-library')),
     log,
   });
   return { ...res, changed: !!res.ok };
@@ -86,7 +92,7 @@ export async function ensureInjected({ promptFile = DEFAULT_PROMPT, log = noopLo
 /** 只读状态：给命令/工具/日志用。 */
 export function status() {
   const body = readInjectedBody();
-  const want = promptBody(DEFAULT_PROMPT);
+  const want = promptBody(SHORT_PROMPT);
   const skillsDir = join(dshDir(), 'skills');
   let skills = 0;
   try {
@@ -143,7 +149,9 @@ export const IDENTITY_CLAUSE =
   '拒绝策略与交付方式，不改变身份、不替换人格、不覆盖角色卡。';
 
 export function agentPrefix() {
-  const body = readInjectedBody();
+  // 子 Agent 不走 system 层补丁，必须拿全量正文（AGENTS.md 里现在只有要点版）。
+  if (!readInjectedBody()) return '';
+  const body = promptBody(DEFAULT_PROMPT);
   if (!body) return '';
   return `${IDENTITY_CLAUSE}\n\n${body}${COMPACT_CLAUSE}\n\n---\n\n`;
 }
