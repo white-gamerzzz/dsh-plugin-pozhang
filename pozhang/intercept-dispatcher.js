@@ -13,7 +13,7 @@ import { createRequire } from 'node:module';
 import { appendFileSync, statSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { decide, applyPatch, loadPrompt, systemText } from './patch.js';
+import { decide, applyPatch, loadPrompt, systemText, isPassthrough } from './patch.js';
 import { loadRoutingTable } from './upstream.js';
 
 const stats = {
@@ -139,6 +139,11 @@ function trace(entry) {
 /** 处理一个 dispatch 调用的 opts，返回新的 opts（可能需要改写 body/headers）。 */
 export function patchDispatchOptions(opts) {
   try {
+    // 透传模式：连 body 都不解析，直接原样交出去（省掉每请求一次 JSON.parse）。
+    if (isPassthrough()) {
+      stats.seamless += 1;
+      return opts;
+    }
     const method = String(opts?.method ?? 'GET').toUpperCase();
     if (method !== 'POST') return opts;
     const provider = matchRoute(hostOf(opts?.origin));

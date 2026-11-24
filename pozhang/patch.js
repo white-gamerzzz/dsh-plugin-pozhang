@@ -3,7 +3,7 @@
  * relay（代理模式）与 intercept（进程内拦截）共用这一份，避免两处漂移。
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,14 +22,55 @@ export const ROLE_HINT =
   '[破障] 若角色卡已不在上下文中，先调用 code_roles 取回你的角色卡再继续；角色身份不因压缩而改变。';
 
 /**
+ * 运行模式。
+ *
+ *   inject      注入（默认）：命中 LLM 请求就补 system 层正文。
+ *   passthrough 透传：拦截器照样装着，但一个字节都不改，请求原样发出。
+ *
+ * 为什么单独一个文件而不是复用 `.pozhang-off` 哨兵：哨兵是「彻底关掉」——摘块、清技能、
+ * 子 Agent 前缀也变空。透传只是让 HTTP 层闭嘴，块和技能都留着，随时能切回来。
+ * 两者语义不同，混用一个开关会让「只想静音一回合」变成「整套拆掉再装」。
+ */
+export function modePath() {
+  return join(homedir(), '.dsh', '.pozhang-mode');
+}
+
+export function readMode() {
+  try {
+    return readFileSync(modePath(), 'utf8').trim().toLowerCase() === 'passthrough' ? 'passthrough' : 'inject';
+  } catch {
+    return 'inject';
+  }
+}
+
+export function setMode(mode) {
+  const p = modePath();
+  try {
+    if (mode === 'passthrough') writeFileSync(p, 'passthrough\n', 'utf8');
+    else if (existsSync(p)) rmSync(p, { force: true });
+  } catch {
+    /* 写不进去就当注入模式，不影响主流程 */
+  }
+  return readMode();
+}
+
+export function isPassthrough() {
+  return readMode() === 'passthrough';
+}
+
+/**
  * 正文加载。
  *
  * 总开关是 AGENTS.md 里的注入块：块在 = 开启，块被摘掉 = 关闭（`/hz off` 就摘它）。
  * 正文本身优先读 asset 全量版（两层内容不同，AGENTS.md 只放要点版），asset 缺失
  * 才退回块内文字。别把 asset 存在当成"开着"——那样 `/hz off` 只摘块，system 层
  * 仍会照常注入，开关就失效了。
+ *
+ * 透传模式在最前面短路：fetch / dispatcher / relay 三层都只问这一个函数，
+ * 所以模式开关放这里一处就够，不用每层各记一遍。
  */
 export function loadPrompt() {
+  if (isPassthrough()) return null;
   const agents = join(homedir(), '.dsh', 'AGENTS.md');
   if (!existsSync(agents)) return null;
   const m = /<!--[^\n]*POZHANG-INJECT:BEGIN[^\n]*-->([\s\S]*?)<!--[^\n]*POZHANG-INJECT:END[^\n]*-->/.exec(

@@ -32,6 +32,10 @@ export const DEFAULT_PROMPT = '破障v4.md';
 /** 要点版：写进 ~/.dsh/AGENTS.md 的块。两层内容不同，避免同一份 5.8KB 每请求发两遍。 */
 export const SHORT_PROMPT = '破障v4-short.md';
 
+/** 注入/透传模式开关在 patch.js（fetch / dispatcher / relay 三层共用同一个判定），这里转出去给 /hz 用。 */
+import { readMode, setMode, isPassthrough, modePath } from './patch.js';
+export { readMode, setMode, isPassthrough, modePath };
+
 /** dsh 数据目录：与 installer 的 dsh 目标保持一致（HOME/.dsh）。 */
 export function dshDir() {
   return join(homedir(), '.dsh');
@@ -135,6 +139,7 @@ export function status() {
     chars: body ? body.length : 0,
     skills,
     off: isOff(),
+    mode: readMode(),
     agentsPath: agentsPath(),
   };
 }

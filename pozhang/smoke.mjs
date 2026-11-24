@@ -98,6 +98,19 @@ const r6 = await ensureInjected({ force: true });
 t('/hz on 清哨兵', status().off === false);
 t('/hz on 重新注入', r6.changed === true && (readInjectedBody() || '').includes('破障'));
 
+// 透传模式：拦截器留着、块留着，只让 HTTP 层不再改请求（和 /hz off 是两回事）
+const PATCH = await import('./patch.js');
+t('默认注入模式', status().mode === 'inject' && PATCH.readMode() === 'inject');
+PATCH.setMode('passthrough');
+t('/hz pass 切到透传', status().mode === 'passthrough');
+t('透传时注入块仍在（与 /hz off 区别）', (readInjectedBody() || '').includes('破障'));
+t('透传时 loadPrompt 为 null（三层一起闭嘴）', PATCH.loadPrompt() === null);
+t('透传时子 Agent 前缀照旧', agentPrefix().includes('破障') || agentPrefix().length > 100);
+t('透传时拦截器仍报透传模式', (await import('./intercept.js')).interceptStatus().mode === 'passthrough');
+PATCH.setMode('inject');
+t('/hz inject 恢复注入', status().mode === 'inject' && (PATCH.loadPrompt() || '').length > 1000);
+t('恢复后不再有模式文件', existsSync(PATCH.modePath()) === false);
+
 rmSync(HOME, { recursive: true, force: true });
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);
 process.exit(fail ? 1 : 0);

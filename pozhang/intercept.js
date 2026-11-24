@@ -13,7 +13,7 @@
 import { appendFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { decide, applyPatch, loadPrompt, systemText } from './patch.js';
+import { decide, applyPatch, loadPrompt, systemText, isPassthrough } from './patch.js';
 import { loadRoutingTable } from './upstream.js';
 import { installDispatcherInterceptor, dispatcherStatus } from './intercept-dispatcher.js';
 
@@ -133,6 +133,8 @@ export function installInterceptor({ onEvent } = {}) {
       const host = hostOf(url);
       const method = String(init?.method ?? (typeof input === 'object' && input?.method) ?? 'GET').toUpperCase();
       if (!isLlmHost(host) || method !== 'POST') return await nextLayer.call(this, input, init);
+      // 透传模式：连 body 都不读（Request 形态要 clone+text，比 JSON.parse 还贵）。
+      if (isPassthrough()) return await nextLayer.call(this, input, init);
 
       // 两种入参形态都要能读：fetch(url, init) 的 init.body，以及 fetch(new Request(...))。
       // billion-context 之类在链条外层时会把 Request 直接递进来，只读 init.body 会静默失效。
@@ -241,6 +243,7 @@ export function uninstallInterceptor() {
 export function interceptStatus() {
   return {
     installed: stats.installed,
+    mode: isPassthrough() ? 'passthrough' : 'inject',
     outermost: stats.installed && globalThis.fetch === installedFetch,
     reasserts,
     seen: stats.seen,
