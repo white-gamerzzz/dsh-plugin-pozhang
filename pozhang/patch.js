@@ -21,17 +21,26 @@ export const IDENTITY =
 export const ROLE_HINT =
   '[破障] 若角色卡已不在上下文中，先调用 code_roles 取回你的角色卡再继续；角色身份不因压缩而改变。';
 
+/**
+ * 正文加载。
+ *
+ * 总开关是 AGENTS.md 里的注入块：块在 = 开启，块被摘掉 = 关闭（`/hz off` 就摘它）。
+ * 正文本身优先读 asset 全量版（两层内容不同，AGENTS.md 只放要点版），asset 缺失
+ * 才退回块内文字。别把 asset 存在当成"开着"——那样 `/hz off` 只摘块，system 层
+ * 仍会照常注入，开关就失效了。
+ */
 export function loadPrompt() {
+  const agents = join(homedir(), '.dsh', 'AGENTS.md');
+  if (!existsSync(agents)) return null;
+  const m = /<!--[^\n]*POZHANG-INJECT:BEGIN[^\n]*-->([\s\S]*?)<!--[^\n]*POZHANG-INJECT:END[^\n]*-->/.exec(
+    readFileSync(agents, 'utf8'),
+  );
+  if (!m) return null;
   if (existsSync(FULL_PROMPT_FILE)) {
     const full = readFileSync(FULL_PROMPT_FILE, 'utf8').trim();
     if (full) return full;
   }
-  // 兜底：asset 缺失时退回 AGENTS.md 块（老版本行为，内容较短但仍可用）
-  const agents = join(homedir(), '.dsh', 'AGENTS.md');
-  if (!existsSync(agents)) return null;
-  const text = readFileSync(agents, 'utf8');
-  const m = /<!--[^\n]*POZHANG-INJECT:BEGIN[^\n]*-->([\s\S]*?)<!--[^\n]*POZHANG-INJECT:END[^\n]*-->/.exec(text);
-  return m ? m[1].trim() : null;
+  return m[1].trim();
 }
 
 /** 只取 system / instructions 层的文本：AGENTS.md 是作为“消息”注入的，
