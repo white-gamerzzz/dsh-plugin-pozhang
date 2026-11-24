@@ -86,6 +86,17 @@ t('卸载后注入块已移除', readInjectedBody() === null);
 t('卸载后用户内容保留', readFileSync(agentsPath(), 'utf8').includes('用中文回答'));
 t('卸载后子 Agent 前缀为空（开关一致）', agentPrefix() === '');
 t('卸载后续发锚点为空', agentAnchor('reviewer') === '');
+t('卸载写了关闭哨兵', status().off === true);
+
+// 哨兵的核心作用：守护每 30s 跑一次 ensureInjected，不能把 /hz off 开回去
+const r5 = await ensureInjected();
+t('哨兵在时 ensureInjected 不注入', r5.off === true && r5.changed === false);
+t('哨兵在时注入块仍为空（守护没补回）', readInjectedBody() === null);
+
+// /hz on 走 force:true，显式清哨兵再注入
+const r6 = await ensureInjected({ force: true });
+t('/hz on 清哨兵', status().off === false);
+t('/hz on 重新注入', r6.changed === true && (readInjectedBody() || '').includes('破障'));
 
 rmSync(HOME, { recursive: true, force: true });
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);

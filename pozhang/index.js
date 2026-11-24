@@ -18,7 +18,7 @@
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 
 const require = createRequire(import.meta.url);
@@ -41,6 +41,31 @@ export function agentsPath() {
 }
 
 const noopLog = () => {};
+
+/**
+ * 关闭哨兵：`/hz off` 写它，`/hz on`（以及 ensureInjected）删它。
+ *
+ * 没有它的话 `/hz off` 是假关闭：摘掉块后 startGuard 每 30 秒跑 ensureInjected，
+ * 见块缺失就补回来，下一次 tick 又开回去了。哨兵让「用户主动关」和「块被外部改坏
+ * 要自愈」区分开——前者不该被守护逻辑覆盖。
+ */
+export function offFlagPath() {
+  return join(dshDir(), '.pozhang-off');
+}
+
+export function isOff() {
+  return existsSync(offFlagPath());
+}
+
+export function setOff(on) {
+  const p = offFlagPath();
+  try {
+    if (on) writeFileSync(p, new Date().toISOString() + '\n', 'utf8');
+    else if (existsSync(p)) rmSync(p, { force: true });
+  } catch {
+    /* 哨兵写不进去不该让主流程崩 */
+  }
+}
 
 /** AGENTS.md 里当前注入块正文（无块返回 null；新旧标记都认）。 */
 export function readInjectedBody() {
@@ -72,7 +97,11 @@ function promptBody(promptFile) {
 }
 
 /** 幂等：内容一致就跳过（不重装 3000+ 技能文件），不一致或缺失才走安装引擎。 */
-export async function ensureInjected({ promptFile = SHORT_PROMPT, log = noopLog } = {}) {
+export async function ensureInjected({ promptFile = SHORT_PROMPT, log = noopLog, force = false } = {}) {
+  // force 是 `/hz on`：显式清哨兵再注入。不带 force 时哨兵优先（守护每 30s 跑一次，
+  // 若它也清哨兵，`/hz off` 会在半分钟内被自己开回来）。
+  if (force) setOff(false);
+  if (isOff()) return { ok: true, changed: false, off: true };
   const want = promptBody(promptFile);
   if (want == null) return { ok: false, changed: false, error: `缺少提示词资源：${promptFile}` };
   const cur = readInjectedBody();
@@ -105,17 +134,21 @@ export function status() {
     upToDate: body != null && want != null && body === want,
     chars: body ? body.length : 0,
     skills,
+    off: isOff(),
     agentsPath: agentsPath(),
   };
 }
 
-/** 卸载：摘掉 AGENTS.md 注入块并清理本插件装过的技能（与破障桌面版同一套逻辑）。 */
+/** 卸载：写关闭哨兵 + 摘掉 AGENTS.md 注入块 + 清理本插件装过的技能。 */
 export async function uninstall({ log = noopLog } = {}) {
-  return installer.run('uninstall', 'dsh', {
+  // 先写哨兵再摘块：顺序反了的话 startGuard 可能在两步之间把块补回来。
+  setOff(true);
+  const res = await installer.run('uninstall', 'dsh', {
     payloadDir: ASSETS_DIR,
     promptPath: join(ASSETS_DIR, DEFAULT_PROMPT),
     log,
   });
+  return { ...res, off: true };
 }
 
 /**
@@ -150,7 +183,7 @@ export const IDENTITY_CLAUSE =
 
 export function agentPrefix() {
   // 子 Agent 不走 system 层补丁，必须拿全量正文（AGENTS.md 里现在只有要点版）。
-  if (!readInjectedBody()) return '';
+  if (isOff() || !readInjectedBody()) return '';
   const body = promptBody(DEFAULT_PROMPT);
   if (!body) return '';
   return `${IDENTITY_CLAUSE}\n\n${body}${COMPACT_CLAUSE}\n\n---\n\n`;
