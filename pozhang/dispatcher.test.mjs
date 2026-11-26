@@ -1,14 +1,35 @@
 // dispatcher 层冒烟：用 undici.request 真实发请求，验证 system 注入发生在 transport 层
 import http from 'node:http';
 import { createRequire } from 'node:module';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
+import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 
-const require = createRequire(import.meta.url);
-const undici = require('C:/Users/White/.dsh/profiles/desktop/node_modules/undici');
-
-process.env.POZHANG_UNDICI = 'C:/Users/White/.dsh/profiles/desktop/node_modules/undici';
+/* undici 不是插件依赖：按 intercept-dispatcher.loadUndici 同款候选顺序解析，
+   绝不写死作者机器路径。必须在覆盖 HOME/USERPROFILE 之前用真实 home 扫描。 */
+const REAL_HOME = process.env.USERPROFILE || homedir();
+function resolveUndiciPath() {
+  const require = createRequire(import.meta.url);
+  const candidates = [
+    'undici',
+    join(REAL_HOME, '.dsh', 'profiles', 'desktop', 'node_modules', 'undici'),
+    join(REAL_HOME, '.dsh', 'dsh-runtimes', 'dsh-primary-runtime', 'dependencies', 'node', 'node_modules', 'undici'),
+  ];
+  try {
+    const root = join(REAL_HOME, '.dsh', 'profiles');
+    for (const name of readdirSync(root, { withFileTypes: true })) {
+      if (name.isDirectory()) candidates.push(join(root, name.name, 'node_modules', 'undici'));
+    }
+  } catch { /* 没有 profiles 目录 */ }
+  for (const spec of candidates) {
+    try { return require.resolve(spec); } catch { /* 试下一个 */ }
+  }
+  throw new Error('找不到 undici：本测试复用宿主 DSH profile 里的 undici（~/.dsh/profiles/<名>/node_modules），或先 npm i undici');
+}
+const undiciPath = resolveUndiciPath();
+const undici = createRequire(import.meta.url)(undiciPath);
+/* 同一路径喂给 loadUndici 的首选候选，保证拦截器补的就是测试手里这份实例 */
+process.env.POZHANG_UNDICI = undiciPath;
 const HOME = mkdtempSync(join(tmpdir(), 'pozhang-disp-'));
 process.env.HOME = HOME;
 process.env.USERPROFILE = HOME;
