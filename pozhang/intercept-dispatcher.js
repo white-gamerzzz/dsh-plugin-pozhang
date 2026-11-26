@@ -29,12 +29,11 @@ const stats = {
 let base = null;
 let wrapper = null;
 
-/** undici 不在插件依赖里：先按常规模块解析，再回退到 dsh profile 的 node_modules。 */
+/** undici 不在插件依赖里：优先宿主 profile 的 node_modules，最后才按常规模块解析（测试机器用 devDependency 兜底）。 */
 function loadUndici() {
   const require = createRequire(import.meta.url);
   const candidates = [
     process.env.POZHANG_UNDICI,
-    'undici',
     join(homedir(), '.dsh', 'profiles', 'desktop', 'node_modules', 'undici'),
     join(homedir(), '.dsh', 'dsh-runtimes', 'dsh-primary-runtime', 'dependencies', 'node', 'node_modules', 'undici'),
   ];
@@ -47,6 +46,8 @@ function loadUndici() {
   } catch {
     /* 没有 profiles 目录 */
   }
+  // 常规解析放最后：生产环境若插件自带 undici（devDependency），不能抢在宿主那份前面
+  candidates.push('undici');
   for (const spec of candidates) {
     if (!spec) continue;
     try {

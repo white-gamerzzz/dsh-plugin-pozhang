@@ -5,13 +5,12 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync } from 'node
 import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 
-/* undici 不是插件依赖：按 intercept-dispatcher.loadUndici 同款候选顺序解析，
-   绝不写死作者机器路径。必须在覆盖 HOME/USERPROFILE 之前用真实 home 扫描。 */
+/* undici 不是插件运行时依赖：按 intercept-dispatcher.loadUndici 同款候选顺序解析（宿主 profile 优先，
+   devDependency 兜底），绝不写死作者机器路径。必须在覆盖 HOME/USERPROFILE 之前用真实 home 扫描。 */
 const REAL_HOME = process.env.USERPROFILE || homedir();
 function resolveUndiciPath() {
   const require = createRequire(import.meta.url);
   const candidates = [
-    'undici',
     join(REAL_HOME, '.dsh', 'profiles', 'desktop', 'node_modules', 'undici'),
     join(REAL_HOME, '.dsh', 'dsh-runtimes', 'dsh-primary-runtime', 'dependencies', 'node', 'node_modules', 'undici'),
   ];
@@ -21,10 +20,12 @@ function resolveUndiciPath() {
       if (name.isDirectory()) candidates.push(join(root, name.name, 'node_modules', 'undici'));
     }
   } catch { /* 没有 profiles 目录 */ }
+  // devDependency 兜底：npm install 后 undici 落在仓库自己的 node_modules
+  candidates.push('undici');
   for (const spec of candidates) {
     try { return require.resolve(spec); } catch { /* 试下一个 */ }
   }
-  throw new Error('找不到 undici：本测试复用宿主 DSH profile 里的 undici（~/.dsh/profiles/<名>/node_modules），或先 npm i undici');
+  throw new Error('找不到 undici：先 npm install（undici 在 devDependencies 里），或确认宿主 DSH profile 存在 ~/.dsh/profiles/<名>/node_modules/undici');
 }
 const undiciPath = resolveUndiciPath();
 const undici = createRequire(import.meta.url)(undiciPath);
