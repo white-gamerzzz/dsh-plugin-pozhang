@@ -36,7 +36,8 @@
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.5",
-    "@deepseek-ai/schemastery": "3.18.5"
+    "@deepseek-ai/schemastery": "3.18.5",
+    "undici": "^7.16.0"
   },
   "dsh": {
     "engines": {
@@ -59,8 +60,5 @@
   "scripts": {
     "smoke": "node pozhang/smoke.mjs",
     "test": "node pozhang/smoke.mjs && node pozhang/patch.test.mjs && node pozhang/autoroute.test.mjs && node pozhang/relay.test.mjs && node pozhang/chain.test.mjs && node pozhang/chain-fallback.test.mjs && node pozhang/intercept.test.mjs && node pozhang/dispatcher.test.mjs"
-  },
-  "devDependencies": {
-    "undici": "^7.16.0"
   }
 }

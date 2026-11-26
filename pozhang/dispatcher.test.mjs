@@ -20,12 +20,12 @@ function resolveUndiciPath() {
       if (name.isDirectory()) candidates.push(join(root, name.name, 'node_modules', 'undici'));
     }
   } catch { /* 没有 profiles 目录 */ }
-  // devDependency 兜底：npm install 后 undici 落在仓库自己的 node_modules
+  // 正式依赖兜底：npm install 后 undici 落在仓库自己的 node_modules
   candidates.push('undici');
   for (const spec of candidates) {
     try { return require.resolve(spec); } catch { /* 试下一个 */ }
   }
-  throw new Error('找不到 undici：先 npm install（undici 在 devDependencies 里），或确认宿主 DSH profile 存在 ~/.dsh/profiles/<名>/node_modules/undici');
+  throw new Error('找不到 undici：先在本目录跑 npm install（undici 是 dependencies 之一），或确认宿主 DSH profile 存在 ~/.dsh/profiles/<名>/node_modules/undici');
 }
 const undiciPath = resolveUndiciPath();
 const undici = createRequire(import.meta.url)(undiciPath);
